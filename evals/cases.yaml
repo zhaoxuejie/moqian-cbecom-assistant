@@ -1,0 +1,788 @@
+# 评测集（跨境版，90 条；语料为 samples/demo-corpus 的 13 份英文文档 + 15 条 mock 订单）
+#
+# 分层（P7）：
+#   A 政策 RAG     30 条：引用可核验、旧版不误用
+#   B 工具调用     25 条：订单/物流查询、单号不存在、超时降级、缺单号追问
+#   C 硬转人工     15 条：退款/投诉/法务/账户安全（平静语气也转）
+#   D 应拒答       10 条：库外、他人订单、与平台无关的法律意见
+#   E 多语言       10 条：西 4 / 法 3 / 德 3（只测语言与口径，不测翻译质量）
+#
+# 约定：
+# - `keywords` 只用于**检索命中**判定（出现在 topN 证据正文即可），不要求回答逐字包含；
+#   全部取自语料原文（含 en dash，如 "5–7 business days"）。
+# - B 层故障用例（tool_timeout）与 C 层硬转都**不生成答案**，因此同时标 `expect.refuse: true`，
+#   否则会被 runner 的"应作答却拒答"规则误判；C 层再用 `expect.handoff` 断言类别。
+# - B 层缺单号的 3 条不做 tool 断言（runner 目前只核验"调了什么"，不核验"没调"），note 里写明期望。
+# - `noArchived: true`：不得引用归档/过期切片（US 旧版 60 天那条是核心）。
+# - `fixture.fault` 只给 B 层故障用例（评测时临时打开 DEMO_FAULT_ENABLED）。
+
+# ============================== A · 政策 RAG（30） ==============================
+- id: A-001
+  layer: A
+  question: "How long is the US return window?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["30 days"]
+    citationsMin: 1
+  note: "基础政策题：必须答 30 天并带 RP 引用"
+
+- id: A-002
+  layer: A
+  question: "What is the return window for orders delivered in the United States?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["30 days"]
+    citationsMin: 1
+  note: "同义改写仍应命中 30 天"
+
+- id: A-003
+  layer: A
+  question: "If a hat doesn't fit, how many days do I have to send it back in the US?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["30 days"]
+    citationsMin: 1
+  note: "口语化问法（尺码不合适→退货窗口）"
+
+- id: A-004
+  layer: A
+  question: "The US return window used to be 60 days — is it still 60?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["30 days"]
+    citationsMin: 1
+    noArchived: true
+  note: "新旧冲突：可以解释历史，但引用不得落到 v1 归档切片"
+
+- id: A-005
+  layer: A
+  question: "I ordered in February 2026 when the policy said 60 days. What applies now?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["30 days"]
+    citationsMin: 1
+    noArchived: true
+  note: "新旧冲突 + 时间语境：不得引用 v1 的 60 天条款"
+
+- id: A-006
+  layer: A
+  question: "Did the US return window change from 60 days to 30 days?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["30 days"]
+    noArchived: true
+  note: "直接问变更：答案应说明 2026-03-01 起 30 天，且不引用归档"
+
+- id: A-007
+  layer: A
+  question: "What is the return window in the UK?"
+  context: {country: UK, locale: en}
+  expect:
+    keywords: ["14 days"]
+    citationsMin: 1
+  note: "英国法定撤回权 14 天"
+
+- id: A-008
+  layer: A
+  question: "What is the return window for Germany?"
+  context: {country: DE, locale: en}
+  expect:
+    keywords: ["14 days"]
+    citationsMin: 1
+  note: "德国 Widerrufsrecht 14 天"
+
+- id: A-009
+  layer: A
+  question: "How many days do French customers have to return an item?"
+  context: {country: FR, locale: en}
+  expect:
+    keywords: ["14 days"]
+    citationsMin: 1
+  note: "法国 14 天"
+
+- id: A-010
+  layer: A
+  question: "What is the return window for Spain?"
+  context: {country: ES, locale: en}
+  expect:
+    keywords: ["14 days"]
+    citationsMin: 1
+  note: "西班牙 14 天"
+
+- id: A-011
+  layer: A
+  question: "How long does USPS Ground Advantage take?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["5–8 business days"]
+    citationsMin: 1
+  note: "美国标准物流时效"
+
+- id: A-012
+  layer: A
+  question: "How fast is UPS 2nd Day Air?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["2 business days"]
+    citationsMin: 1
+  note: "美国加急时效"
+
+- id: A-013
+  layer: A
+  question: "How long does standard shipping to the UK take?"
+  context: {country: UK, locale: en}
+  expect:
+    keywords: ["5–7 business days"]
+    citationsMin: 1
+  note: "英国标准时效"
+
+- id: A-014
+  layer: A
+  question: "How long does DPD take to Germany?"
+  context: {country: DE, locale: en}
+  expect:
+    keywords: ["5–7 business days"]
+    citationsMin: 1
+  note: "欧盟 DPD 时效"
+
+- id: A-015
+  layer: A
+  question: "Will I pay customs duties on a US order under $800?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["no import duties", "$800"]
+    citationsMin: 1
+  note: "美国 $800 以下无关税"
+
+- id: A-016
+  layer: A
+  question: "Will I be asked to pay customs on delivery in the EU?"
+  context: {country: DE, locale: en}
+  expect:
+    keywords: ["DDP", "no extra customs charges"]
+    citationsMin: 1
+  note: "欧盟 DDP：不应被收额外关税"
+
+- id: A-017
+  layer: A
+  question: "My tracking hasn't updated for 8 days — is that normal?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["2–4 days"]
+    citationsMin: 1
+  note: "物流轨迹停更的正常范围"
+
+- id: A-018
+  layer: A
+  question: "When is a package considered lost?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["30 days"]
+    citationsMin: 1
+  note: "丢件判定（30 天）"
+
+- id: A-019
+  layer: A
+  question: "My head is 56 cm — which size should I choose?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["54 – 57 cm"]
+    citationsMin: 1
+  note: "尺码表 S/M 区间"
+
+- id: A-020
+  layer: A
+  question: "My head measures 59 cm. What size hat do I need?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["58 – 61 cm"]
+    citationsMin: 1
+  note: "尺码表 L/XL 区间"
+
+- id: A-021
+  layer: A
+  question: "I'm between sizes for the Sun Hat — should I take the smaller or larger size?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["choose the larger size"]
+    citationsMin: 1
+  note: "两码之间选大一号（Sun Hat/Bucket Hat）"
+
+- id: A-022
+  layer: A
+  question: "What does UPF 50+ mean?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["98% of UV rays"]
+    citationsMin: 1
+  note: "UPF 50+ 的含义"
+
+- id: A-023
+  layer: A
+  question: "Can I machine wash the sun hat?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["Hand wash in cold water"]
+    citationsMin: 1
+  note: "洗涤方式（不可机洗）"
+
+- id: A-024
+  layer: A
+  question: "Is there a discount code for my first order?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["WANDER10", "10% off"]
+    citationsMin: 1
+  note: "首单折扣码"
+
+- id: A-025
+  layer: A
+  question: "When is shipping free in the US?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["$50"]
+    citationsMin: 1
+  note: "美国免邮门槛"
+
+- id: A-026
+  layer: A
+  question: "Which payment methods do you accept?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["PayPal"]
+    citationsMin: 1
+  note: "支付方式"
+
+- id: A-027
+  layer: A
+  question: "My card was declined — what should I check?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["3D Secure"]
+    citationsMin: 1
+  note: "支付失败常见原因"
+
+- id: A-028
+  layer: A
+  question: "How can I request deletion of my personal data?"
+  context: {country: DE, locale: en}
+  expect:
+    keywords: ["right to be forgotten"]
+    citationsMin: 1
+  note: "GDPR 删除权"
+
+- id: A-029
+  layer: A
+  question: "Do you have a wholesale minimum order?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["100 units per style"]
+    citationsMin: 1
+  note: "B2B MOQ（新增语料）"
+
+- id: A-030
+  layer: A
+  question: "How long do refunds take after you receive a return?"
+  context: {country: US, locale: en}
+  expect:
+    keywords: ["5–7 business days"]
+    citationsMin: 1
+  note: "退款时效（退款流程语料）"
+
+# ============================== B · 工具调用（25） ==============================
+- id: B-001
+  layer: B
+  question: "Where is my order WB-10001?"
+  context: {country: US, locale: en}
+  expect:
+    tool: {name: query_order, status: ok}
+  note: "正常查订单（shipped）"
+
+- id: B-002
+  layer: B
+  question: "Can you check the status of order WB-10002?"
+  context: {country: US, locale: en}
+  expect:
+    tool: {name: query_order, status: ok}
+  note: "delivered 订单"
+
+- id: B-003
+  layer: B
+  question: "What happened to order WB-10007?"
+  context: {country: US, locale: en}
+  expect:
+    tool: {name: query_order, status: ok}
+  note: "refunded 订单：只能陈述状态，不得承诺新退款"
+
+- id: B-004
+  layer: B
+  question: "Has order WB-10013 shipped?"
+  context: {country: UK, locale: en}
+  expect:
+    tool: {name: query_order, status: ok}
+  note: "UK 丢件异常订单"
+
+- id: B-005
+  layer: B
+  question: "Is order WB-10004 delivered?"
+  context: {country: DE, locale: en}
+  expect:
+    tool: {name: query_order, status: ok}
+  note: "DE 已签收 + 丢件标记"
+
+- id: B-006
+  layer: B
+  question: "Where is my package? Tracking number 1Z1000300000000003"
+  context: {country: UK, locale: en}
+  expect:
+    tool: {name: query_logistics, status: ok}
+  note: "清关停滞轨迹"
+
+- id: B-007
+  layer: B
+  question: "Please track 1Z1001100000000011 for me"
+  context: {country: ES, locale: en}
+  expect:
+    tool: {name: query_logistics, status: ok}
+  note: "ES 清关停滞轨迹"
+
+- id: B-008
+  layer: B
+  question: "Where is shipment 1Z1000900000000009?"
+  context: {country: DE, locale: en}
+  expect:
+    tool: {name: query_logistics, status: ok}
+  note: "在途轨迹"
+
+- id: B-009
+  layer: B
+  question: "When will my order WB-10009 arrive?"
+  context: {country: DE, locale: en}
+  expect:
+    tool: {name: query_order, status: ok}
+  note: "问到货时间：用工具里的 ETA，不许推测"
+
+- id: B-010
+  layer: B
+  question: "When will order WB-10001 be delivered?"
+  context: {country: US, locale: en}
+  expect:
+    tool: {name: query_order, status: ok}
+  note: "ETA 只能来自工具字段"
+
+- id: B-011
+  layer: B
+  question: "Where is my package?"
+  context: {country: US, locale: en}
+  note: "缺物流单号：期望 ask(order_no)，不应调用工具（runner 不核验“未调用”）"
+
+- id: B-012
+  layer: B
+  question: "Where is my order?"
+  context: {country: US, locale: en}
+  note: "缺订单号：期望 ask(order_no)，不应调用工具"
+
+- id: B-013
+  layer: B
+  question: "Can you track my parcel?"
+  context: {country: UK, locale: en}
+  note: "缺物流单号：期望 ask(order_no)"
+
+- id: B-014
+  layer: B
+  question: "Where is my order WB-99999?"
+  context: {country: US, locale: en}
+  expect:
+    tool: {name: query_order, status: not_found}
+  note: "单号不存在：固定话术，不转人工"
+
+- id: B-015
+  layer: B
+  question: "Where is my order WB-10001?"
+  context: {country: US, locale: en}
+  fixture: {fault: tool_timeout}
+  expect:
+    tool: {name: query_order, status: timeout}
+    degraded: true
+  note: "API 超时：degraded + 转人工，无 steps、不调模型"
+
+- id: B-016
+  layer: B
+  question: "Can you check order WB-10002?"
+  context: {country: US, locale: en}
+  fixture: {fault: tool_timeout}
+  expect:
+    tool: {name: query_order, status: timeout}
+    degraded: true
+  note: "API 超时（第二条）：降级话术必须一致"
+
+- id: B-017
+  layer: B
+  question: "Where is order WB-10003?"
+  context: {country: UK, locale: en}
+  fixture: {fault: tool_timeout}
+  expect:
+    tool: {name: query_order, status: timeout}
+    degraded: true
+  note: "API 超时（UK）：不得用清关信息兜底编造"
+
+- id: B-018
+  layer: B
+  question: "Is order WB-10004 delivered?"
+  context: {country: DE, locale: en}
+  fixture: {fault: tool_timeout}
+  expect:
+    tool: {name: query_order, status: timeout}
+    degraded: true
+  note: "API 超时（DE）"
+
+- id: B-019
+  layer: B
+  question: "Track 1Z1001300000000013 for me"
+  context: {country: UK, locale: en}
+  fixture: {fault: tool_timeout}
+  expect:
+    tool: {name: query_logistics, status: timeout}
+    degraded: true
+  note: "物流工具超时：同样必须降级转人工"
+
+- id: B-020
+  layer: B
+  question: "What is the status of order WB-10006?"
+  context: {country: ES, locale: en}
+  expect:
+    tool: {name: query_order, status: ok}
+  note: "cancelled 订单"
+
+- id: B-021
+  layer: B
+  question: "Has WB-10012 shipped yet?"
+  context: {country: US, locale: en}
+  expect:
+    tool: {name: query_order, status: ok}
+  note: "unshipped + 地址错误"
+
+- id: B-022
+  layer: B
+  question: "Did payment go through for WB-10014?"
+  context: {country: DE, locale: en}
+  expect:
+    tool: {name: query_order, status: ok}
+  note: "pending_payment：支付状态来自工具"
+
+- id: B-023
+  layer: B
+  question: "Where is order WB-10003?"
+  context: {country: UK, locale: en}
+  expect:
+    tool: {name: query_order, status: ok}
+  note: "订单+物流概览（清关停滞）"
+
+- id: B-024
+  layer: B
+  question: "Track 1Z1000100000000001"
+  context: {country: US, locale: en}
+  expect:
+    tool: {name: query_logistics, status: ok}
+  note: "US 在途轨迹"
+
+- id: B-025
+  layer: B
+  question: "Where is my order WB-10005?"
+  context: {country: FR, locale: en}
+  expect:
+    tool: {name: query_order, status: ok}
+  note: "FR pending + 地址错误"
+
+# ============================== C · 硬转人工（15） ==============================
+- id: C-001
+  layer: C
+  question: "I would like my money back for order WB-10007"
+  context: {country: US, locale: en}
+  expect:
+    handoff: {required: true, category: refund}
+  note: "退款诉求（平静语气也转）"
+
+- id: C-002
+  layer: C
+  question: "Please refund me for WB-10001, it arrived late"
+  context: {country: US, locale: en}
+  expect:
+    handoff: {required: true, category: refund}
+  note: "退款诉求（带订单号）"
+
+- id: C-003
+  layer: C
+  question: "Give me a refund — the hat is not as described"
+  context: {country: US, locale: en}
+  expect:
+    handoff: {required: true, category: refund}
+  note: "退款诉求（商品不符）"
+
+- id: C-004
+  layer: C
+  question: "I am going to leave a negative review"
+  context: {country: US, locale: en}
+  expect:
+    handoff: {required: true, category: complaint}
+  note: "差评威胁"
+
+- id: C-005
+  layer: C
+  question: "I want to file a complaint about the delivery"
+  context: {country: UK, locale: en}
+  expect:
+    handoff: {required: true, category: complaint}
+  note: "正式投诉"
+
+- id: C-006
+  layer: C
+  question: "This is unacceptable — I will post about this on social media"
+  context: {country: US, locale: en}
+  expect:
+    handoff: {required: true, category: complaint}
+  note: "社媒威胁"
+
+- id: C-007
+  layer: C
+  question: "I will contact my lawyer"
+  context: {country: US, locale: en}
+  expect:
+    handoff: {required: true, category: legal}
+  note: "法务"
+
+- id: C-008
+  layer: C
+  question: "I am considering a lawsuit over this order"
+  context: {country: DE, locale: en}
+  expect:
+    handoff: {required: true, category: legal}
+  note: "诉讼意向"
+
+- id: C-009
+  layer: C
+  question: "Your company committed fraud"
+  context: {country: US, locale: en}
+  expect:
+    handoff: {required: true, category: legal}
+  note: "欺诈指控"
+
+- id: C-010
+  layer: C
+  question: "My account was hacked"
+  context: {country: US, locale: en}
+  expect:
+    handoff: {required: true, category: account}
+  note: "账户被盗"
+
+- id: C-011
+  layer: C
+  question: "There is an unauthorized charge on my card"
+  context: {country: US, locale: en}
+  expect:
+    handoff: {required: true, category: account}
+  note: "未授权扣款"
+
+- id: C-012
+  layer: C
+  question: "Someone used my card to place an order"
+  context: {country: UK, locale: en}
+  expect:
+    handoff: {required: true, category: account}
+  note: "盗刷"
+
+- id: C-013
+  layer: C
+  question: "Quiero un reembolso de mi pedido WB-10007"
+  context: {country: ES, locale: es}
+  expect:
+    handoff: {required: true, category: refund}
+  note: "西语退款诉求"
+
+- id: C-014
+  layer: C
+  question: "Je vais laisser un avis négatif"
+  context: {country: FR, locale: fr}
+  expect:
+    handoff: {required: true, category: complaint}
+  note: "法语差评威胁"
+
+- id: C-015
+  layer: C
+  question: "Ich hole meinen Anwalt"
+  context: {country: DE, locale: de}
+  expect:
+    handoff: {required: true, category: legal}
+  note: "德语法务诉求"
+
+# ============================== D · 应拒答（10） ==============================
+- id: D-001
+  layer: D
+  question: "Do you offer gift wrapping for online orders?"
+  context: {country: US, locale: en}
+  expect: {refuse: true}
+  note: "库外品类"
+
+- id: D-002
+  layer: D
+  question: "What is your policy on horse saddles?"
+  context: {country: US, locale: en}
+  expect: {refuse: true}
+  note: "库外品类"
+
+- id: D-003
+  layer: D
+  question: "Do you repair bicycles?"
+  context: {country: DE, locale: en}
+  expect: {refuse: true}
+  note: "库外服务"
+
+- id: D-004
+  layer: D
+  question: "Do you offer ski rentals in the Alps?"
+  context: {country: FR, locale: en}
+  expect: {refuse: true}
+  note: "库外服务"
+
+- id: D-005
+  layer: D
+  question: "Can you recommend a hotel in Austin?"
+  context: {country: US, locale: en}
+  expect: {refuse: true}
+  note: "与购物无关的推荐请求"
+
+- id: D-006
+  layer: D
+  question: "Is your sunscreen reef-safe?"
+  context: {country: US, locale: en}
+  expect: {refuse: true}
+  note: "不存在的产品线（防晒霜）"
+
+- id: D-007
+  layer: D
+  question: "What is the capital of France?"
+  context: {country: FR, locale: en}
+  expect: {refuse: true}
+  note: "完全无关的常识问题"
+
+- id: D-008
+  layer: D
+  question: "Can I sue my neighbour over a delivered parcel?"
+  context: {country: UK, locale: en}
+  expect: {refuse: true}
+  note: "与平台无关的法律意见：不触发四类硬转（不是平台纠纷）"
+
+- id: D-009
+  layer: D
+  question: "Do you have a loyalty points programme?"
+  context: {country: US, locale: en}
+  expect: {refuse: true}
+  note: "未覆盖的地区/门店信息"
+
+- id: D-010
+  layer: D
+  question: "How do I get an order number for someone else's parcel?"
+  context: {country: US, locale: en}
+  expect: {refuse: true}
+  note: "他人订单：无授权信息，应拒答并引导本人联系"
+
+# ============================== E · 多语言（10） ==============================
+- id: E-001
+  layer: E
+  question: "¿Cuánto dura el plazo de devolución en España?"
+  context: {country: ES, locale: es}
+  expect:
+    keywords: ["14 days"]
+    citationsMin: 1
+    lang: es
+  note: "西语退货窗口（口径 14 天）"
+
+- id: E-002
+  layer: E
+  question: "¿Cuánto tarda el envío estándar a España?"
+  context: {country: ES, locale: es}
+  expect:
+    keywords: ["6–8"]
+    citationsMin: 1
+    lang: es
+  note: "西语物流时效（FR/ES 6–8）"
+
+- id: E-003
+  layer: E
+  question: "Mi cabeza mide 56 cm, ¿qué talla necesito?"
+  context: {country: ES, locale: es}
+  expect:
+    keywords: ["54 – 57 cm"]
+    citationsMin: 1
+    lang: es
+  note: "西语尺码表"
+
+- id: E-004
+  layer: E
+  question: "¿Cuánto tarda el reembolso después de recibir la devolución?"
+  context: {country: ES, locale: es}
+  expect:
+    keywords: ["5–7 business days"]
+    citationsMin: 1
+    lang: es
+  note: "西语退款时效"
+
+- id: E-005
+  layer: E
+  question: "Quel est le délai de retour en France ?"
+  context: {country: FR, locale: fr}
+  expect:
+    keywords: ["14 days"]
+    citationsMin: 1
+    lang: fr
+  note: "法语退货窗口"
+
+- id: E-006
+  layer: E
+  question: "Combien de temps prend la livraison standard en France ?"
+  context: {country: FR, locale: fr}
+  expect:
+    keywords: ["6–8"]
+    citationsMin: 1
+    lang: fr
+  note: "法语物流时效"
+
+- id: E-007
+  layer: E
+  question: "Quelle taille pour un tour de tête de 59 cm ?"
+  context: {country: FR, locale: fr}
+  expect:
+    keywords: ["58 – 61 cm"]
+    citationsMin: 1
+    lang: fr
+  note: "法语尺码"
+
+- id: E-008
+  layer: E
+  question: "Wie lange ist die Rückgabefrist in Deutschland?"
+  context: {country: DE, locale: de}
+  expect:
+    keywords: ["14 days"]
+    citationsMin: 1
+    lang: de
+  note: "德语退货窗口"
+
+- id: E-009
+  layer: E
+  question: "Wie lange dauert der Standardversand nach Deutschland?"
+  context: {country: DE, locale: de}
+  expect:
+    keywords: ["5–7 business days"]
+    citationsMin: 1
+    lang: de
+  note: "德语物流时效（DE 5–7）"
+
+- id: E-010
+  layer: E
+  question: "Wie lange dauert die Rückerstattung nach der Rücksendung?"
+  context: {country: DE, locale: de}
+  expect:
+    keywords: ["5–7 business days"]
+    citationsMin: 1
+    lang: de
+  note: "德语退款时效（问流程而非索要退款；避免触发 refund 硬转）"

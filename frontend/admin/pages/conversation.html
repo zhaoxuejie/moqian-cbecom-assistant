@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>会话详情 · 客服智能体管理台</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+<script src="../controllers/theme-boot.js?v=20261091"></script>
+<link rel="stylesheet" href="/ui-design/tokens.css" />
+<link rel="stylesheet" href="../styles/admin.css?v=20261091" />
+</head>
+<body data-page="conversation">
+<div class="layout">
+
+  <!-- 侧边栏由 layout.js 注入（单点维护），页面只留挂载点 -->
+  <aside class="side" id="appSide"></aside>
+
+  <div class="main">
+    <header class="topbar">
+      <h1>会话详情</h1>
+      <span class="topbar__sub" id="convSub">消息流 · 引用原文 · 工具调用 · 转人工记录</span>
+      <div class="topbar__right">
+        <a class="btn btn--ghost btn--sm" href="conversations.html">
+          <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          返回列表
+        </a>
+        <button class="btn btn--ghost btn--sm" id="exportJson" type="button" disabled>
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>
+          导出 JSON
+        </button>
+        <button class="btn btn--ghost btn--sm" id="exportMd" type="button" disabled>
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
+          导出 Markdown
+        </button>
+        <span class="topbar__pill">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          本机环境
+        </span>
+      </div>
+    </header>
+
+    <main class="content">
+      <div id="convError" class="empty" hidden>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        <span id="convErrorText">会话不存在或加载失败</span>
+      </div>
+
+      <div class="card" id="convSummaryCard" hidden>
+        <div class="card__head">
+          <h2>会话摘要</h2>
+          <span class="card__head spacer"></span>
+          <span id="convIntegrity" style="font-size:11.5px;color:#8a97a3">—</span>
+        </div>
+        <div class="card__body">
+          <div class="conv-summary" id="convSummary"></div>
+        </div>
+      </div>
+
+      <div class="card" id="convMessagesCard" style="margin-top:16px" hidden>
+        <div class="card__head">
+          <h2>消息流</h2>
+          <span class="card__head spacer"></span>
+          <span style="font-size:11.5px;color:#8a97a3">点引用可展开知识库原文（导出包内含同样快照）</span>
+        </div>
+        <div id="convMessages"></div>
+      </div>
+
+      <div class="card" id="convHandoffsCard" style="margin-top:16px" hidden>
+        <div class="card__head">
+          <h2>转人工记录</h2>
+          <span class="card__head spacer"></span>
+        </div>
+        <div id="convHandoffs"></div>
+      </div>
+
+      <div class="card" id="convDocsCard" style="margin-top:16px" hidden>
+        <div class="card__head">
+          <h2>涉及的文档</h2>
+          <span class="card__head spacer"></span>
+        </div>
+        <div id="convDocs"></div>
+      </div>
+
+      <div class="hint" style="margin-top:14px">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <span>导出的 JSON 含 <code>integrity.sha256</code>（去掉该字段后重算即可校验未被改动）；
+        Markdown 适合人工阅读与转给平台。两条声明都写在文件里，不只挂在页面上。</span>
+      </div>
+      <div class="hint" style="margin-top:6px">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>本系统只辅助举证，不保证 PayPal 纠纷胜诉；演示数据全部虚构。</span>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+<script src="../adapters/real-api.js?v=20261091"></script>
+<script src="../adapters/conversations-api.js?v=20261091"></script>
+    <script src="../controllers/i18n.js?v=20261092"></script>
+    <script src="../controllers/layout.js?v=20261091"></script>
+<script src="../controllers/app.js?v=20261091"></script>
+<script src="../controllers/conversation.js?v=20261091"></script>
+<script src="../controllers/preview.js?v=20261091"></script>
+</body>
+</html>

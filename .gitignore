@@ -1,0 +1,75 @@
+# ============================================================
+# moqian-cbecom-assistant · 忽略规则
+# 来源：moqian-service-assistant v1.3.0 的 .gitignore，按跨境项目调整：
+#   1. 本地环境文件忽略，仅提交 .env.example
+#   2. 演示语料 samples/demo-corpus/ 是纯文本评测基准，必须入库（可复算）
+# ============================================================
+
+# ---- 操作系统 / 编辑器垃圾 ----
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+*.bak
+*.orig
+*.rej
+
+# ---- Python（后端 app/ modules/ 与 worker）----
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+.venv/
+venv/
+env/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# ---- Node（零构建，仅工具脚本使用）----
+node_modules/
+dist/
+.vite/
+.eslintcache
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# ---- 密钥与环境配置（LLM_* / POSTGRES_* / JWT_SECRET 等）----
+.env
+.env.*
+!.env.example
+
+# ---- 运行期数据：上传原件、解析中间产物、日志、备份 ----
+*.log
+logs/
+data/
+uploads/
+tmp/
+*.dump
+
+# ---- 本地验证产物 ----
+.tmp-probe/
+
+# ---- pip / pytest 在仓库根可能留下的中间目录 ----
+pip-build-env-*/
+pip-build-tracker-*/
+pip-ephem-wheel-cache-*/
+pip-install-*/
+pip-*.whl
+jieba.cache
+pytest-of-*/

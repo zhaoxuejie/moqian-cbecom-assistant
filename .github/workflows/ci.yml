@@ -1,0 +1,62 @@
+name: ci
+
+# 触发面刻意收窄：只跟 main 有关，避免分支上的试错提交把 Actions 刷成一屏红叉。
+#   - push 到 main           → 跑（main 永远可部署，这条纪律靠它兜底）
+#   - PR 目标分支是 main     → 跑（将来真走 PR 也不漏，fork 来的 PR 同理）
+#   - push 到 feature/* 等   → 不跑；要单独验证某分支时手动触发，见文件末尾注释
+#   发布与部署由仓库维护者独立配置，本工作流不连接私有服务器。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# 同一 ref 上连续补推时取消上一轮：不堆一串排队/互相踩的 job
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: 后端（ruff + pytest，含契约与数据库用例）
+    runs-on: ubuntu-latest
+    services:
+      # 与 docker-compose 同镜像：任务队列、会话、登录等用例需要真 PG + pgvector
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: moqian
+          POSTGRES_PASSWORD: moqian
+          POSTGRES_DB: moqian
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U moqian -d moqian"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://moqian:moqian@127.0.0.1:5433/moqian
+      APP_ENV: ci
+      # 测试不调真模型；CI 里只需配置合法形状（缺 key 的用例走配置错误分支）
+      LLM_BASE_URL: https://llm.invalid
+      LLM_MODEL: test-model
+      LLM_API_KEY: sk-ci-placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: 安装依赖
+        run: pip install -e ".[dev]"
+      - name: 建表（有序 SQL 迁移）
+        run: python -m app.migrate
+      - name: ruff
+        run: ruff check .
+      - name: pytest（离线用例 + 数据库用例）
+        run: pytest

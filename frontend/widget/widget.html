@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Support</title>
+<link rel="stylesheet" href="/ui-design/tokens.css">
+  <link rel="stylesheet" href="styles/widget.css">
+<script>
+  /* 直接打开（无宿主）时自绘原型同款 400×640 浮层；被 loader 嵌入时铺满 iframe 外壳 */
+  document.documentElement.classList.toggle('w-standalone', window.parent === window);
+</script>
+</head>
+<!-- 真实 chat_widget 的 iframe 内容页：DOM 与 widget-prototype/index.html 的面板一致。
+     浮层入口按钮与 400×640 外壳由宿主页的 loader.js 负责，本页只渲染面板内部。 -->
+<body class="w-embed">
+
+<!-- 聊天面板（原型 #wPanel 同结构；iframe 内常驻展开） -->
+<section id="wPanel" class="w-panel">
+  <header class="w-head">
+    <div class="w-head__id">
+      <span class="w-head__logo">
+        <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+      </span>
+      <div>
+        <div class="w-head__title" id="wBrandTitle">Support</div>
+        <div class="w-head__sub" id="wCtxLine">Loading conversation context…</div>
+      </div>
+      <!-- 身份标签：只表达"系统认不认得你"，未识别时转琥珀（PRD §2.3） -->
+      <span class="w-idtag" id="wIdTag" title="Set by the deployment">Identifying...</span>
+    </div>
+    <div class="w-head__ops">
+      <button class="w-iconbtn" id="wHandoffHead" title="Human agent">
+        <svg viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5a9 9 0 0 1 18 0v5a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>
+      </button>
+      <button class="w-iconbtn" id="wClose" title="Collapse">
+        <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- 弱网状态条：只在浏览器真实 offline 事件时显示（D-004 未实现断网自动重发） -->
+  <div class="w-netbar" id="wNetbar" hidden>
+    <svg viewBox="0 0 24 24"><line x1="2" x2="22" y1="2" y2="22"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M2 8.82a15 15 0 0 1 4.17-2.65M10.66 5c4.01-.36 8.14.9 11.34 3.76"/><path d="M16.85 11.25a10 10 0 0 0-2.2-1.4M5 13a10 10 0 0 1 5.24-2.76"/><path d="M12 20h.01"/></svg>
+    <span id="wNetText">Connection lost. Reconnect, then send your question again.</span>
+  </div>
+
+  <!-- 未识别身份提示条（不阻塞任何操作，只说明不计入个人统计） -->
+  <div class="w-idnote" id="wIdNote" hidden>
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    <span id="wIdNoteText">Identity not recognized. You can still chat, but answers won't be linked to your account.</span>
+  </div>
+
+  <div class="w-body" id="wBody"><!-- 消息流由 app.js 渲染 --></div>
+
+  <footer class="w-foot">
+    <div class="w-input">
+      <textarea id="wInput" rows="1" placeholder="Ask about shipping, returns, sizing or an order…"></textarea>
+      <button id="wSend" class="w-send" title="Send">
+        <svg viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+      </button>
+    </div>
+    <!-- 演示额度：只显示「本次会话还可提问 N 次」，每日额度不下发（运营参数不是产品信息） -->
+    <div class="w-quota" id="wQuota" hidden></div>
+    <div class="w-foot__hint" id="wFootHint">AI-generated answers. Check the linked sources for policy details.</div>
+  </footer>
+</section>
+
+<!-- 转人工弹层（字段全部来自 POST /widget/handoff 的真实返回） -->
+<div class="w-modal" id="wHandoffModal" hidden>
+  <div class="w-modal__box">
+    <div class="w-modal__head">
+      <svg viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5a9 9 0 0 1 18 0v5a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>
+      <h3>Talk to a human agent</h3>
+    </div>
+    <p class="w-modal__lead">This context goes with you — no need to repeat it:</p>
+    <ul class="w-carry" id="wCarryList"></ul>
+    <div class="w-hotline">
+      <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+      <div><b id="wHotline">—</b><span id="wHotlineMeta">Loading contact details…</span><br/><span id="wHotlineNote"></span></div>
+    </div>
+    <div class="w-modal__ops">
+      <button class="w-btn w-btn--ghost" id="wHandoffCancel">Cancel</button>
+      <button class="w-btn w-btn--primary" id="wHandoffOk">Connect me</button>
+    </div>
+  </div>
+</div>
+
+<!-- toast -->
+<div class="w-toasts" id="wToasts"></div>
+
+<script src="adapters/api.js"></script>
+<script src="controllers/app.js"></script>
+</body>
+</html>
